@@ -78,8 +78,8 @@ The Elixir package downloads prebuilt `pglited-oxide` binaries from GitHub
 release assets. Build and publish them with:
 
 ```sh
-git tag pglited-oxide-v0.1.0
-git push origin pglited-oxide-v0.1.0
+git tag pglited-oxide-v0.1.1
+git push origin pglited-oxide-v0.1.1
 ```
 
 The workflow publishes:

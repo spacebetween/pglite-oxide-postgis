@@ -35,6 +35,68 @@ use tempfile::TempDir;
 // `pglite-oxide-assets` 0.5.0 does not ship PostGIS bytes; install via
 // `install_extension_bytes` before the server opens.
 const POSTGIS_ARCHIVE: &[u8] = include_bytes!("../../dist/postgis.tar.zst");
+const TSEARCH_DATA: &[(&str, &[u8])] = &[
+    (
+        "danish.stop",
+        include_bytes!("../assets/tsearch_data/danish.stop"),
+    ),
+    (
+        "dutch.stop",
+        include_bytes!("../assets/tsearch_data/dutch.stop"),
+    ),
+    (
+        "english.stop",
+        include_bytes!("../assets/tsearch_data/english.stop"),
+    ),
+    (
+        "finnish.stop",
+        include_bytes!("../assets/tsearch_data/finnish.stop"),
+    ),
+    (
+        "french.stop",
+        include_bytes!("../assets/tsearch_data/french.stop"),
+    ),
+    (
+        "german.stop",
+        include_bytes!("../assets/tsearch_data/german.stop"),
+    ),
+    (
+        "hungarian.stop",
+        include_bytes!("../assets/tsearch_data/hungarian.stop"),
+    ),
+    (
+        "italian.stop",
+        include_bytes!("../assets/tsearch_data/italian.stop"),
+    ),
+    (
+        "nepali.stop",
+        include_bytes!("../assets/tsearch_data/nepali.stop"),
+    ),
+    (
+        "norwegian.stop",
+        include_bytes!("../assets/tsearch_data/norwegian.stop"),
+    ),
+    (
+        "portuguese.stop",
+        include_bytes!("../assets/tsearch_data/portuguese.stop"),
+    ),
+    (
+        "russian.stop",
+        include_bytes!("../assets/tsearch_data/russian.stop"),
+    ),
+    (
+        "spanish.stop",
+        include_bytes!("../assets/tsearch_data/spanish.stop"),
+    ),
+    (
+        "swedish.stop",
+        include_bytes!("../assets/tsearch_data/swedish.stop"),
+    ),
+    (
+        "turkish.stop",
+        include_bytes!("../assets/tsearch_data/turkish.stop"),
+    ),
+];
 
 fn main() {
     if let Err(err) = run() {
@@ -82,6 +144,7 @@ fn run() -> Result<()> {
     // PostGIS source archives.
     let paths = PglitePaths::with_root(&root);
     install_extension_bytes(&paths, POSTGIS_ARCHIVE).context("install bundled PostGIS archive")?;
+    install_tsearch_data(&paths).context("install bundled text search data")?;
 
     // CITEXT and VECTOR are registered with the builder so PgliteServer's
     // proxy re-runs `CREATE EXTENSION IF NOT EXISTS …` for them on every new
@@ -198,6 +261,33 @@ fn sanitize_prefix(s: &str) -> String {
             }
         })
         .collect()
+}
+
+fn install_tsearch_data(paths: &PglitePaths) -> Result<()> {
+    let dir = paths
+        .mount_root()
+        .join("pglite")
+        .join("share")
+        .join("postgresql")
+        .join("tsearch_data");
+    std::fs::create_dir_all(&dir)
+        .with_context(|| format!("create text search data dir {}", dir.display()))?;
+
+    for (name, contents) in TSEARCH_DATA {
+        let path = dir.join(name);
+        let needs_write = match std::fs::read(&path) {
+            Ok(existing) => existing != *contents,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
+            Err(err) => return Err(err).with_context(|| format!("read {}", path.display())),
+        };
+
+        if needs_write {
+            std::fs::write(&path, contents)
+                .with_context(|| format!("write text search data {}", path.display()))?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Connects to our just-started TCP server and runs:
