@@ -23,7 +23,7 @@ use pglite_oxide::{
     install_extension_bytes, PglitePaths, PgliteServer,
 };
 use serde_json::json;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process;
@@ -108,7 +108,7 @@ fn main() {
 
 fn run() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let (data_arg, port, multiplexer, init_sql_file) = parse_args(&args)?;
+    let (data_arg, port, multiplexer, init_sql_file, exit_on_stdin_eof) = parse_args(&args)?;
 
     // Resolve the storage root.
     //   memory://... -> fresh temp dir, dropped on exit
@@ -162,14 +162,15 @@ fn run() -> Result<()> {
         .start()
         .context("PgliteServer::start failed")?;
 
+    let bound_addr = server.tcp_addr().unwrap_or(addr);
+    let bound_port = bound_addr.port();
+
     // One-shot self-connect that runs CREATE EXTENSION postgis and (if
     // requested) the init-sql-file. After this, postgis types are in
     // pg_type and every subsequent Postgrex connection sees them at
     // type-cache build time.
-    bootstrap(addr, init_sql_file.as_deref())
+    bootstrap(bound_addr, init_sql_file.as_deref())
         .context("bootstrap PostGIS / seed via self-connect")?;
-
-    let bound_port = server.tcp_addr().map(|a| a.port()).unwrap_or(port);
 
     // ex_pglite waits for this JSON line on stdout before declaring the port
     // ready. Match the original pglited shape so consumers don't have to
@@ -199,6 +200,10 @@ fn run() -> Result<()> {
         ctrlc::set_handler(move || shutdown.store(true, Ordering::SeqCst))
             .context("install signal handler")?;
     }
+    if exit_on_stdin_eof {
+        let shutdown = Arc::clone(&shutdown);
+        std::thread::spawn(move || watch_stdin_eof(shutdown));
+    }
 
     // Park until SIGINT/SIGTERM, then shut down cleanly. We poll a short
     // interval rather than using park_timeout/condvar because Drop on
@@ -212,7 +217,7 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn parse_args(args: &[String]) -> Result<(String, u16, Option<String>, Option<PathBuf>)> {
+fn parse_args(args: &[String]) -> Result<(String, u16, Option<String>, Option<PathBuf>, bool)> {
     if args.len() < 2 {
         anyhow::bail!(
             "usage: pglited-oxide <data_dir> <tcp_port> \
@@ -226,6 +231,7 @@ fn parse_args(args: &[String]) -> Result<(String, u16, Option<String>, Option<Pa
 
     let mut multiplexer = None;
     let mut init_sql_file = None;
+    let mut exit_on_stdin_eof = false;
     let mut i = 2;
     while i < args.len() {
         match args[i].as_str() {
@@ -245,10 +251,39 @@ fn parse_args(args: &[String]) -> Result<(String, u16, Option<String>, Option<Pa
                 init_sql_file = Some(PathBuf::from(val));
                 i += 2;
             }
+            "--exit-on-stdin-eof" => {
+                exit_on_stdin_eof = true;
+                i += 1;
+            }
             other => anyhow::bail!("unknown argument: {other}"),
         }
     }
-    Ok((data_dir, port, multiplexer, init_sql_file))
+    Ok((
+        data_dir,
+        port,
+        multiplexer,
+        init_sql_file,
+        exit_on_stdin_eof,
+    ))
+}
+
+fn watch_stdin_eof(shutdown: Arc<AtomicBool>) {
+    let mut buf = [0_u8; 1024];
+    let mut stdin = std::io::stdin();
+
+    loop {
+        match stdin.read(&mut buf) {
+            Ok(0) => {
+                shutdown.store(true, Ordering::SeqCst);
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {
+                shutdown.store(true, Ordering::SeqCst);
+                break;
+            }
+        }
+    }
 }
 
 fn sanitize_prefix(s: &str) -> String {
