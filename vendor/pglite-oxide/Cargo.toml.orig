@@ -1,0 +1,123 @@
+[package]
+name = "pglite-oxide"
+version = "0.5.0"
+edition = "2024"
+rust-version = "1.92"
+description = "Embedded Postgres for Rust tests and local apps. No Docker, works with SQLx and any Postgres client."
+readme = "README.md"
+repository = "https://github.com/f0rr0/pglite-oxide"
+homepage = "https://github.com/f0rr0/pglite-oxide"
+documentation = "https://docs.rs/pglite-oxide"
+keywords = ["postgres", "pglite", "wasm", "database", "embedded"]
+categories = ["database-implementations", "wasm", "development-tools::testing"]
+license = "MIT AND Apache-2.0 AND PostgreSQL"
+exclude = [
+  ".github/**",
+  "Cargo.toml.orig",
+  "assets/checkouts/**",
+  "assets/wasix-build/build/**",
+  "assets/wasix-build/work/**",
+  "crates/**",
+  "examples/tauri-sqlx-vanilla/**",
+  "release-plz.toml",
+  "xtask/**",
+]
+
+[workspace]
+members = [
+  ".",
+  "crates/assets",
+  "crates/aot/aarch64-apple-darwin",
+  "crates/aot/x86_64-unknown-linux-gnu",
+  "crates/aot/aarch64-unknown-linux-gnu",
+  "crates/aot/x86_64-pc-windows-msvc",
+  "xtask",
+]
+exclude = ["examples/tauri-sqlx-vanilla/src-tauri"]
+resolver = "3"
+
+[features]
+default = ["bundled", "extensions"]
+bundled = [
+  "dep:pglite-oxide-assets",
+  "dep:pglite-oxide-aot-aarch64-apple-darwin",
+  "dep:pglite-oxide-aot-x86_64-unknown-linux-gnu",
+  "dep:pglite-oxide-aot-aarch64-unknown-linux-gnu",
+  "dep:pglite-oxide-aot-x86_64-pc-windows-msvc",
+]
+extensions = ["bundled"]
+
+[package.metadata.pglite-oxide.assets]
+postgres-version = "17.5"
+postgres-pglite-branch = "REL_17_5-pglite"
+pglite-build-repo = "electric-sql/pglite-build"
+pglite-build-branch = "portable"
+pglite-build-commit = "c195113dbaf09488f8d5eeb2db91dacd123b74d0"
+pglite-npm-version-checked = "0.4.5"
+runtime-archive-sha256 = "86290d461e59cca2c4a8024b6d9ce6792f29d737d233a301552a4cf944958b70"
+pglite-wasix-sha256 = "fc9098cd176d162380c149e26d07dd8f06f67f59c82eb3bb5bc3a34a2cd596a9"
+pgdata-template-archive-sha256 = "02174b2175c1d4339f7f259d1a01ea599fae2e3785856b1124fa59e542f64b7a"
+pg-dump-wasix-sha256 = "f09cd32f383221ce5207061f4b5b4854e45d5ab33dbb3741c5830b0545c3d8eb"
+initdb-wasix-sha256 = "eb1182ae8cfa52d6557e886ffc362b555ce8e3d8d5bf44311ae80ef863c8aebe"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+tar = "0.4"
+zstd = { version = "0.13", default-features = false }
+directories = "6"
+tracing = "0.1"
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+tempfile = "3"
+hex = "0.4"
+sha2 = "0.10"
+dunce = "1"
+filetime = "0.2"
+pglite-oxide-assets = { version = "=0.5.0", path = "crates/assets", optional = true }
+tokio = { version = "1", features = ["io-util", "rt-multi-thread"] }
+wasmer = { version = "7.2.0-alpha.2", default-features = false, features = [
+  "sys",
+  "headless",
+  "compiler",
+  "wasmer-artifact-load",
+] }
+wasmer-config = "0.702.0-alpha.2"
+wasmer-types = "7.2.0-alpha.2"
+wasmer-wasix = { version = "0.702.0-alpha.2", default-features = false, features = [
+  "sys-minimal",
+  "sys-poll",
+  "host-vnet",
+  "time",
+] }
+webc = "11.0.0"
+
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+pglite-oxide-aot-aarch64-apple-darwin = { version = "=0.5.0", path = "crates/aot/aarch64-apple-darwin", optional = true }
+
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+pglite-oxide-aot-x86_64-unknown-linux-gnu = { version = "=0.5.0", path = "crates/aot/x86_64-unknown-linux-gnu", optional = true }
+
+[target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
+pglite-oxide-aot-aarch64-unknown-linux-gnu = { version = "=0.5.0", path = "crates/aot/aarch64-unknown-linux-gnu", optional = true }
+
+[target.'cfg(all(target_os = "windows", target_arch = "x86_64"))'.dependencies]
+pglite-oxide-aot-x86_64-pc-windows-msvc = { version = "=0.5.0", path = "crates/aot/x86_64-pc-windows-msvc", optional = true }
+
+[dev-dependencies]
+sqlx = { version = "0.8", default-features = false, features = [
+  "postgres",
+  "runtime-tokio",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-postgres = "0.7"
+
+[[bin]]
+name = "pglite-dump"
+path = "src/bin/pglite_dump.rs"
+
+[[bin]]
+name = "pglite-proxy"
+path = "src/bin/pglite_proxy.rs"

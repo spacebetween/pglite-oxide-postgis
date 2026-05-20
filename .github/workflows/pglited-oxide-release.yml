@@ -1,0 +1,104 @@
+name: pglited-oxide release binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "pglited-oxide-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  postgis-archive:
+    name: Build PostGIS WASIX archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build PostGIS WASIX Docker image
+        run: |
+          docker build \
+            -t pglite-oxide-postgis \
+            -f docker/Dockerfile \
+            --build-arg PG_VERSION=17.5 \
+            --build-arg POSTGIS_VERSION=3.5.2 \
+            .
+
+      - name: Extract postgis.tar.zst
+        run: |
+          mkdir -p dist
+          docker run --rm -v "$PWD/dist:/out" pglite-oxide-postgis \
+            cp /build/extensions/postgis.tar.zst /out/postgis.tar.zst
+          test -s dist/postgis.tar.zst
+
+      - name: Upload PostGIS archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgis-archive
+          path: dist/postgis.tar.zst
+          if-no-files-found: error
+
+  binaries:
+    name: Build ${{ matrix.target }}
+    needs: postgis-archive
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PostGIS archive
+        uses: actions/download-artifact@v4
+        with:
+          name: postgis-archive
+          path: dist
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          cache: true
+          cache-workspaces: pglited-oxide
+
+      - name: Fetch cargo dependencies
+        working-directory: pglited-oxide
+        run: cargo fetch --locked
+
+      - name: Generate host AOT artifacts
+        run: ./scripts/compile_aot.sh dist/postgis.tar.zst
+
+      - name: Build pglited-oxide
+        working-directory: pglited-oxide
+        run: cargo build --release --locked
+
+      - name: Package binary
+        run: ./scripts/package_pglited_oxide.sh "${{ matrix.target }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pglited-oxide-${{ matrix.target }}
+          path: |
+            release-assets/pglited-oxide-${{ matrix.target }}.tar.gz
+            release-assets/pglited-oxide-${{ matrix.target }}.tar.gz.sha256
+          if-no-files-found: error
+
+      - name: Upload GitHub release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 ||
+            gh release create "${GITHUB_REF_NAME}" --draft --generate-notes ||
+            gh release view "${GITHUB_REF_NAME}" >/dev/null
+          gh release upload "${GITHUB_REF_NAME}" \
+            "release-assets/pglited-oxide-${{ matrix.target }}.tar.gz" \
+            "release-assets/pglited-oxide-${{ matrix.target }}.tar.gz.sha256" \
+            --clobber

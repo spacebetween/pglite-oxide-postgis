@@ -1,0 +1,6 @@
+# postgis extension
+comment = 'PostGIS geometry and geography spatial types and functions'
+default_version = '3.5.2'
+module_pathname = '$libdir/postgis-3'
+relocatable = false
+schema = public

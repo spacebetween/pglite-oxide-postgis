@@ -1,0 +1,64 @@
+# pglite-oxide Extension Catalog
+#
+# This is the master catalog for all WASIX PostgreSQL extensions.
+# PostGIS is registered as a "stable" extension alongside
+# the existing pgvector and citext extensions.
+
+[catalog]
+version = 2
+
+# === Stable extensions ===
+
+[[extensions]]
+name = "pgvector"
+version = "0.8.0"
+promotion = "stable"
+bundle = "pgvector.tar.zst"
+
+[[extensions]]
+name = "citext"
+version = "1.0"
+promotion = "stable"
+bundle = "citext.tar.zst"
+
+# === PostGIS — newly promoted to stable ===
+
+[[extensions]]
+name = "postgis"
+version = "3.5.2"
+promotion = "stable"
+bundle = "postgis.tar.zst"
+metadata = """
+  [extension.metadata]
+  description = "PostGIS geometry and geography spatial types and functions"
+  homepage = "https://postgis.net"
+  license = "GPL-2.0"
+
+  [[extension.depends]]
+  name = "geos"
+  version_min = "3.14.0"
+
+  [[extension.depends]]
+  name = "proj"
+  version_min = "9.7.0"
+
+  [[extension.depends]]
+  name = "json-c"
+  version_min = "0.18"
+
+  [[extension.depends]]
+  name = "libxml2"
+  version_min = "2.13.0"
+
+  [[extension.depends]]
+  name = "sqlite"
+  version_min = "3.46.0"
+
+  [[extension.load_order]]
+  so = "postgis-3.so"
+  required = true
+
+  [[extension.load_order]]
+  so = "postgis_topology-3.so"
+  required = false
+"""

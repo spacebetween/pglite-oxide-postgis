@@ -1,0 +1,12 @@
+.DS_Store
+/target/
+/pglited-oxide/target/
+/tests/pglited-oxide/target/
+/tests/postgis-smoke/target/
+/tmp/
+/dist/
+/aot-artifacts/
+/artifacts/
+/release-assets/
+/build/
+*.log

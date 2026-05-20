@@ -1,0 +1,11 @@
+.git
+.DS_Store
+artifacts/
+dist/
+aot-artifacts/
+target/
+pglited-oxide/target/
+tests/pglited-oxide/target/
+tests/postgis-smoke/target/
+tmp/
+*.log

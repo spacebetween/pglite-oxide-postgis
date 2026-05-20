@@ -1,0 +1,2 @@
+[env]
+PGLITE_OXIDE_GENERATED_AOT_DIR = { value = "../../aot-artifacts", relative = true }

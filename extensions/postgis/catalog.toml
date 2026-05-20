@@ -1,0 +1,44 @@
+# pglite-oxide Extension Catalog
+#
+# This file registers PostGIS in the extension catalog with
+# promotion status, dependencies, and load order.
+
+[extension]
+name = "postgis"
+version = "3.5.2"
+promotion = "stable"
+
+[extension.metadata]
+description = "PostGIS geometry and geography spatial types and functions"
+homepage = "https://postgis.net"
+license = "GPL-2.0"
+
+[[extension.depends]]
+name = "geos"
+version_min = "3.14.0"
+
+[[extension.depends]]
+name = "proj"
+version_min = "9.7.0"
+
+[[extension.depends]]
+name = "json-c"
+version_min = "0.18"
+
+[[extension.depends]]
+name = "libxml2"
+version_min = "2.13.0"
+
+[[extension.depends]]
+name = "sqlite"
+version_min = "3.46.0"
+
+# Load order: postgis-3.so must load first for core geometry types,
+# then postgis_topology-3.so for topology support.
+[[extension.load_order]]
+so = "postgis-3.so"
+required = true
+
+[[extension.load_order]]
+so = "postgis_topology-3.so"
+required = false
